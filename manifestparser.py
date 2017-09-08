@@ -11,12 +11,14 @@ class ManifestParser:
   T_HSSLIVE = 3
 
 
-  def __init__(self):
+  def __init__(self, proxy=""):
     self._url = None
     self._type = ManifestParser.T_OTHER
     self._baseurl = None
     self._manifest = None  # XMLTree element of the Manifest file
     self._duration = None
+    self._proxy = proxy
+
 
 
   def gettype(self):
@@ -39,6 +41,7 @@ class ManifestParser:
     self._cv.setopt(pycurl.USERAGENT, "manifestparser")
     self._cv.setopt(pycurl.SSL_VERIFYHOST, False)
     self._cv.setopt(pycurl.SSL_VERIFYPEER, False)
+    self._cv.setopt(pycurl.PROXY, self._proxy)
     if ip is not None:
       self._cv.setopt(pycurl.INTERFACE, ip)
 
