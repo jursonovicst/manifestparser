@@ -107,6 +107,11 @@ class ManifestParser:
         yield int(repr.attrib['bandwidth'])
 
 
+  def getfragmentpathsfor(self, bitrate, type="video"):
+    for url in self.getfragmenturlsfor(bitrate, type):
+      yield urlparse(url['url'])['path']
+
+
   def getfragmenturlsfor(self, bitrate, type="video"):
     if self._type == ManifestParser.T_HSS:
       timescale = self._manifest.get('TimeScale',10000000)
