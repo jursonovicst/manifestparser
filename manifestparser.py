@@ -109,7 +109,7 @@ class ManifestParser:
 
   def getfragmentpathsfor(self, bitrate, type="video"):
     for url in self.getfragmenturlsfor(bitrate, type):
-      yield urlparse(url['url'])['path']
+      yield urlparse(url['url']).path
 
 
   def getfragmenturlsfor(self, bitrate, type="video"):
