@@ -114,7 +114,7 @@ class ManifestParser:
 
   def getfragmenturlsfor(self, bitrate, type="video"):
     if self._type == ManifestParser.T_HSS:
-      timescale = self._manifest.get('TimeScale',10000000)
+      timescale = int(self._manifest.get('TimeScale',10000000))
       baseurl = self._url.replace('/Manifest','') + '/' + self._manifest.find("./StreamIndex[@Type='" + type + "']").attrib['Url'].replace('{bitrate}',str(bitrate))
 
       t=0
