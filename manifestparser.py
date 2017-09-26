@@ -139,7 +139,8 @@ class ManifestParser:
 
   def getrndbitratefor(self, type="video"):
     bitrates = []
-    bitrates.append(i for i in self.getbitratesfor(type))
+    for i in self.getbitratesfor(type):
+      bitrates.append(i)
     return random.choice(bitrates)
 
 
