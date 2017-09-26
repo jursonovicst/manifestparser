@@ -173,7 +173,7 @@ class ManifestParser:
         if c.attrib.has_key('d'):
           while True:
             yield {'url': baseurl.replace('{start time}', str(t)), 'byterange': None, 'time': (t - t0) / timescale, 'duration': d}
-            t +=
+            t += d
 
 
     elif self._type == ManifestParser.T_DASH:     #TODO: check and rewrite
