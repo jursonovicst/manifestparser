@@ -138,7 +138,9 @@ class ManifestParser:
     return min(i for i in self.getbitratesfor(type))
 
   def getrndbitratefor(self, type="video"):
-    return random.choice(i for i in self.getbitratesfor(type))
+    bitrates = []
+    bitrates.append(i for i in self.getbitratesfor(type))
+    return random.choice(bitrates)
 
 
   # returns a tuple of {url, byterange, fragmentlength} for all fragments
