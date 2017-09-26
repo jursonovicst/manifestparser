@@ -2,7 +2,7 @@ import pycurl
 from StringIO import *
 import xml.etree.ElementTree as ET
 from urlparse import urlparse
-
+import random
 
 class ManifestParser:
   T_OTHER = 0
@@ -106,6 +106,15 @@ class ManifestParser:
       for repr in aset.findall("./ns:Representation", ns):
         yield int(repr.attrib['bandwidth'])
 
+
+  def getmaxbitratefor(self, type="video"):
+    return max(self.getbitratesfor(type))
+
+  def getminbitratefor(self, type="video"):
+    return min(self.getbitratesfor(type))
+
+  def getrndbitratefor(self, type="video"):
+    return random.choice(self.getbitratesfor(type))
 
   def getfragmentpathsfor(self, bitrate, type="video"):
     for url in self.getfragmenturlsfor(bitrate, type):
