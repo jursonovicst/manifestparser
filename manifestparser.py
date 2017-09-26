@@ -183,7 +183,7 @@ class ManifestParser:
   # returns a tuple of {path, byterange, fragmentlength} for all fragments
   def getfragmentpathsfor(self, bitrate, type="video"):
     for url,byterange,fragmentlength in self.getfragmenturlsfor(bitrate, type):
-      yield {'path': urlparse(url['url']).path, 'byterange': byterange, 'fragmentlength': fragmentlength }
+      yield {'path': urlparse(url).path, 'byterange': byterange, 'fragmentlength': fragmentlength }
 
 
   def _getrepurl(self, bitrate, type="video"):  # TODO: type check not present
