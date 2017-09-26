@@ -152,8 +152,9 @@ class ManifestParser:
 
       t=0
       for c in self._manifest.findall("./StreamIndex[@Type='" + type + "']/c"):
-        yield {'url': baseurl.replace('{start time}',str(t)), 'byterange': None, 'fragmentlength': t/timescale}
-        t += int(c.attrib['d'])
+        d = int(c.attrib['d'])
+        yield {'url': baseurl.replace('{start time}',str(t)), 'byterange': None, 'time': t/timescale, 'duration':d}
+        t += d
 
     elif self._type == ManifestParser.T_HSSLIVE:
       timescale = self.gettimescale()
@@ -164,12 +165,15 @@ class ManifestParser:
         t = int(c.attrib['t'])
         if t0 is None:
           t0 = t
-        yield {'url': baseurl.replace('{start time}', str(t)), 'byterange': None, 'fragmentlength': (t - t0) / timescale}
+
+        raise Exception("This should be implemented!!!")
+        d=int(c.attrib['d'])
+        yield {'url': baseurl.replace('{start time}', str(t)), 'byterange': None, 'time': (t - t0) / timescale, 'duration': d}
 
         if c.attrib.has_key('d'):
           while True:
-            yield {'url': baseurl.replace('{start time}', str(t)), 'byterange': None, 'fragmentlength': (t - t0) / timescale}
-            t += int(c.attrib['d'])
+            yield {'url': baseurl.replace('{start time}', str(t)), 'byterange': None, 'time': (t - t0) / timescale, 'duration': d}
+            t +=
 
 
     elif self._type == ManifestParser.T_DASH:     #TODO: check and rewrite
@@ -180,13 +184,13 @@ class ManifestParser:
       offset = int(repsegurl['byterange'].split('-')[1])
       logging.debug(offset)
       for ret in mp4.getsidxsubsegments(repseg):
-        yield {'url': repurl, 'byterange': "%d-%d" % (ret['from'], ret['to']), 'fragmentlength': ret['duration']}
+        yield {'url': repurl, 'byterange': "%d-%d" % (ret['from'], ret['to']), 'time': ret['duration']}
 
 
   # returns a tuple of {path, byterange, fragmentlength} for all fragments
   def getfragmentpathsfor(self, bitrate, type="video"):
     for ret in self.getfragmenturlsfor(bitrate, type):
-      yield {'path': urlparse(ret['url']).path, 'byterange': ret['byterange'], 'fragmentlength': ret['fragmentlength'] }
+      yield {'path': urlparse(ret['url']).path, 'byterange': ret['byterange'], 'time': ret['time'], 'duration': ret['duration']}
 
 
   def _getrepurl(self, bitrate, type="video"):  # TODO: type check not present
