@@ -10,23 +10,31 @@ class ManifestParser:
   T_HSS = 2
   T_HSSLIVE = 3
 
+  @staticmethod
+  def typetostring(type):
+    if type == ManifestParser.T_DASH:
+      return "Dash"
+    elif type == ManifestParser.T_HSS:
+      return "HSS"
+    elif type == ManifestParser.T_HSSLIVE
+      return "HSS Live"
+
+    return "Unknown"
+
 
   def __init__(self, proxy=""):
     self._url = None
     self._type = ManifestParser.T_OTHER
     self._baseurl = None
     self._manifest = None  # XMLTree element of the Manifest file
-    self._duration = None
     self._proxy = proxy
-
 
 
   def gettype(self):
     return self._type
 
-
-  def getduration(self):
-    return self._duration
+  def gettypestring(self):
+    return ManifestParser.typetostring(self.gettype())
 
 
   def fetchmanifest(self, url, ip=None):
@@ -34,7 +42,6 @@ class ManifestParser:
     self._type = ManifestParser.T_OTHER
     self._baseurl = None
     self._manifest = None
-    self._duration = None
 
     self._cv = pycurl.Curl()
     self._cv.setopt(pycurl.FOLLOWLOCATION, True)
@@ -71,7 +78,6 @@ class ManifestParser:
         raise NotImplementedError("Smooth streaming protocol: %s is not implemented." % self._manifest.attrib['MajorVersion'])
 
       self._type = ManifestParser.T_HSS
-      self._duration = int(self._manifest.get('Duration')) / int(self._manifest.get('TimeScale',10000000))
       if self._manifest.get('IsLive', 'false').lower() == 'true':
         self._type = ManifestParser.T_HSSLIVE
 
@@ -90,6 +96,24 @@ class ManifestParser:
       raise NotImplementedError("Unknown manifest: %s" % self._manifest.tag)
 
     return True
+
+
+  # returns the length of the asset in sec.
+  def getduration(self):
+    if self._type == ManifestParser.T_HSS:
+      return int(self._manifest.get('Duration')) / self.gettimescale()
+    elif self._type == ManifestParser.T_HSSLIVE:
+      return None
+
+    raise Exception("Not implemented for %s streams." %   self.gettypestring())
+
+
+  # returns the timescale in local unit
+  def gettimescale(self):
+    if self._type == ManifestParser.T_HSS or self._type == ManifestParser.T_HSSLIVE:
+      return int(self._manifest.get('TimeScale',10000000))    #HSS default value
+
+    raise Exception("Not implemented for %s streams." % self.gettypestring())
 
 
   def getbitratesfor(self, type="video"):
@@ -116,23 +140,20 @@ class ManifestParser:
   def getrndbitratefor(self, type="video"):
     return random.choice(self.getbitratesfor(type))
 
-  def getfragmentpathsfor(self, bitrate, type="video"):
-    for url in self.getfragmenturlsfor(bitrate, type):
-      yield urlparse(url['url']).path
 
-
+  # returns a tuple of {url, byterange, fragmentlength} for all fragments
   def getfragmenturlsfor(self, bitrate, type="video"):
     if self._type == ManifestParser.T_HSS:
-      timescale = int(self._manifest.get('TimeScale',10000000))
+      timescale = self.gettimescale()
       baseurl = self._url.replace('/Manifest','') + '/' + self._manifest.find("./StreamIndex[@Type='" + type + "']").attrib['Url'].replace('{bitrate}',str(bitrate))
 
       t=0
       for c in self._manifest.findall("./StreamIndex[@Type='" + type + "']/c"):
-        yield {'url': baseurl.replace('{start time}',str(t)), 'byterange': None, 'time': t/timescale}
+        yield {'url': baseurl.replace('{start time}',str(t)), 'byterange': None, 'fragmentlength': t/timescale}
         t += int(c.attrib['d'])
 
     elif self._type == ManifestParser.T_HSSLIVE:
-      timescale = self._manifest.get('TimeScale', 10000000)
+      timescale = self.gettimescale()
       baseurl = self._url.replace('/Manifest', '') + '/' + self._manifest.find("./StreamIndex[@Type='" + type + "']").attrib['Url'].replace('{bitrate}', str(bitrate))
 
       t0 = None
@@ -140,13 +161,12 @@ class ManifestParser:
         t = int(c.attrib['t'])
         if t0 is None:
           t0 = t
-        yield {'url': baseurl.replace('{start time}', str(t)), 'byterange': None, 'time': (t - t0) / timescale}
+        yield {'url': baseurl.replace('{start time}', str(t)), 'byterange': None, 'fragmentlength': (t - t0) / timescale}
 
         if c.attrib.has_key('d'):
           while True:
-            yield {'url': baseurl.replace('{start time}', str(t)), 'byterange': None, 'time': (t - t0) / timescale}
+            yield {'url': baseurl.replace('{start time}', str(t)), 'byterange': None, 'fragmentlength': (t - t0) / timescale}
             t += int(c.attrib['d'])
-          break
 
 
     elif self._type == ManifestParser.T_DASH:     #TODO: check and rewrite
@@ -157,7 +177,13 @@ class ManifestParser:
       offset = int(repsegurl['byterange'].split('-')[1])
       logging.debug(offset)
       for ret in mp4.getsidxsubsegments(repseg):
-        yield {'url': repurl, 'byterange': "%d-%d" % (ret['from'], ret['to']), 'duration': ret['duration']}
+        yield {'url': repurl, 'byterange': "%d-%d" % (ret['from'], ret['to']), 'fragmentlength': ret['duration']}
+
+
+  # returns a tuple of {path, byterange, fragmentlength} for all fragments
+  def getfragmentpathsfor(self, bitrate, type="video"):
+    for url,byterange,fragmentlength in self.getfragmenturlsfor(bitrate, type):
+      yield {'path': urlparse(url['url']).path, 'byterange': byterange, 'fragmentlength': fragmentlength }
 
 
   def _getrepurl(self, bitrate, type="video"):  # TODO: type check not present
