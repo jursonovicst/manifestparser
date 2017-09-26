@@ -153,7 +153,7 @@ class ManifestParser:
       t=0
       for c in self._manifest.findall("./StreamIndex[@Type='" + type + "']/c"):
         d = int(c.attrib['d'])
-        yield {'url': baseurl.replace('{start time}',str(t)), 'byterange': None, 'time': t/timescale, 'duration':d}
+        yield {'url': baseurl.replace('{start time}',str(t)), 'byterange': None, 'time': t/timescale, 'duration': d / timescale}
         t += d
 
     elif self._type == ManifestParser.T_HSSLIVE:
@@ -168,11 +168,11 @@ class ManifestParser:
 
         raise Exception("This should be implemented!!!")
         d=int(c.attrib['d'])
-        yield {'url': baseurl.replace('{start time}', str(t)), 'byterange': None, 'time': (t - t0) / timescale, 'duration': d}
+        yield {'url': baseurl.replace('{start time}', str(t)), 'byterange': None, 'time': (t - t0) / timescale, 'duration': d/ timescale}
 
         if c.attrib.has_key('d'):
           while True:
-            yield {'url': baseurl.replace('{start time}', str(t)), 'byterange': None, 'time': (t - t0) / timescale, 'duration': d}
+            yield {'url': baseurl.replace('{start time}', str(t)), 'byterange': None, 'time': (t - t0) / timescale, 'duration': d/ timescale}
             t += d
 
 
