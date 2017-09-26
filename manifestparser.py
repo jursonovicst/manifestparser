@@ -132,13 +132,13 @@ class ManifestParser:
 
 
   def getmaxbitratefor(self, type="video"):
-    yield max(self.getbitratesfor(type))
+    yield max(i for i in self.getbitratesfor(type))
 
   def getminbitratefor(self, type="video"):
-    yield min(self.getbitratesfor(type))
+    yield min(i for i in self.getbitratesfor(type))
 
   def getrndbitratefor(self, type="video"):
-    yield random.choice(self.getbitratesfor(type))
+    yield random.choice(i for i in self.getbitratesfor(type))
 
 
   # returns a tuple of {url, byterange, fragmentlength} for all fragments
