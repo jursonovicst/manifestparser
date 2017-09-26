@@ -182,16 +182,15 @@ class ManifestParser:
 
   # returns a tuple of {path, byterange, fragmentlength} for all fragments
   def getfragmentpathsfor(self, bitrate, type="video"):
-    for url,byterange,fragmentlength in self.getfragmenturlsfor(bitrate, type):
-      yield {'path': urlparse(url).path, 'byterange': byterange, 'fragmentlength': fragmentlength }
+    for ret in self.getfragmenturlsfor(bitrate, type):
+      yield {'path': urlparse(ret['url']).path, 'byterange': ret['byterange'], 'fragmentlength': ret['fragmentlength'] }
 
 
   def _getrepurl(self, bitrate, type="video"):  # TODO: type check not present
     url = ""
     if self._type == ManifestParser.T_DASH:
       ns = {'ns': 'urn:mpeg:DASH:schema:MPD:2011'}
-      url = self._baseurl + self._manifest.find(".//ns:Representation[@bandwidth='" + str(bitrate) + "']/ns:BaseURL",
-                                                ns).text
+      url = self._baseurl + self._manifest.find(".//ns:Representation[@bandwidth='" + str(bitrate) + "']/ns:BaseURL",ns).text
     return url
 
   def getrepsegurl(self, bitrate, type="video"):  # TODO: type check not present
