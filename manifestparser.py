@@ -16,7 +16,7 @@ class ManifestParser:
       return "Dash"
     elif type == ManifestParser.T_HSS:
       return "HSS"
-    elif type == ManifestParser.T_HSSLIVE
+    elif type == ManifestParser.T_HSSLIVE:
       return "HSS Live"
 
     return "Unknown"
