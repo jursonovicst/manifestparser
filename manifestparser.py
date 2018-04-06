@@ -5,18 +5,18 @@ from urlparse import urlparse
 import random
 
 class ManifestParser:
-  T_OTHER = 0
-  T_DASH = 1
-  T_HSS = 2
-  T_HSSLIVE = 3
+  ST_OTHER = 0
+  ST_DASH = 1
+  ST_HSS = 2
+  ST_HSSLIVE = 3
 
   @staticmethod
-  def typetostring(type):
-    if type == ManifestParser.T_DASH:
+  def streamtypetostring(type):
+    if type == ManifestParser.ST_DASH:
       return "Dash"
-    elif type == ManifestParser.T_HSS:
+    elif type == ManifestParser.ST_HSS:
       return "HSS"
-    elif type == ManifestParser.T_HSSLIVE:
+    elif type == ManifestParser.ST_HSSLIVE:
       return "HSS Live"
 
     return "Unknown"
@@ -24,22 +24,22 @@ class ManifestParser:
 
   def __init__(self, proxy=""):
     self._url = None
-    self._type = ManifestParser.T_OTHER
+    self._streamtype = ManifestParser.ST_OTHER
     self._baseurl = None
-    self._manifest = None  # XMLTree element of the Manifest file
-    self._proxy = proxy
+    self._manifest = None   # XMLTree element for the dash/hss Manifest file
+    self._proxy = proxy     # proxy string
 
 
-  def gettype(self):
-    return self._type
+  def getstreamtype(self):
+    return self._streamtype
 
-  def gettypestring(self):
-    return ManifestParser.typetostring(self.gettype())
+  def getstreamtypestring(self):
+    return ManifestParser.streamtypetostring(self.getstreamtype())
 
-
-  def fetchmanifest(self, url, ip=None):
+  # Returns true or false
+  def fetchmanifest(self, url, localip=None):
     self._url = None
-    self._type = ManifestParser.T_OTHER
+    self._streamtype = ManifestParser.ST_OTHER
     self._baseurl = None
     self._manifest = None
 
@@ -49,8 +49,8 @@ class ManifestParser:
     self._cv.setopt(pycurl.SSL_VERIFYHOST, False)
     self._cv.setopt(pycurl.SSL_VERIFYPEER, False)
     self._cv.setopt(pycurl.PROXY, self._proxy)
-    if ip is not None:
-      self._cv.setopt(pycurl.INTERFACE, ip)
+    if localip is not None:
+      self._cv.setopt(pycurl.INTERFACE, localip)
 
     buffer = StringIO()
     self._cv.setopt(self._cv.URL, url.rstrip())
@@ -75,11 +75,11 @@ class ManifestParser:
 
     if self._manifest.tag == "SmoothStreamingMedia":
       if self._manifest.get('MajorVersion','') != "2":
-        raise NotImplementedError("Smooth streaming protocol: %s is not implemented." % self._manifest.attrib['MajorVersion'])
+        raise NotImplementedError("Smooth streaming protocol version: %s.x is not implemented." % self._manifest.attrib['MajorVersion'])
 
-      self._type = ManifestParser.T_HSS
+      self._streamtype = ManifestParser.ST_HSS
       if self._manifest.get('IsLive', 'false').lower() == 'true':
-        self._type = ManifestParser.T_HSSLIVE
+        self._streamtype = ManifestParser.ST_HSSLIVE
 
 
     elif self._manifest.tag == "{urn:mpeg:DASH:schema:MPD:2011}MPD":
@@ -87,7 +87,7 @@ class ManifestParser:
         raise NotImplementedError("MPEG-DASH profile: %s is not implemented." % self._manifest.attrib['profiles'])
 
       self._url = self._url.rstrip()
-      self._type = ManifestParser.T_DASH
+      self._streamtype = ManifestParser.ST_DASH
       d = urlparse(self._url)
       self._baseurl = d.scheme + "://" + d.netloc + '/'.join(d.path.split('/')[0:-1]) + '/'
 
@@ -98,30 +98,42 @@ class ManifestParser:
     return True
 
 
-  # returns the length of the asset in sec.
   def getduration(self):
-    if self._type == ManifestParser.T_HSS:
+    if self._streamtype == ManifestParser.ST_HSS:
       return int(self._manifest.get('Duration')) / self.gettimescale()
-    elif self._type == ManifestParser.T_HSSLIVE:
+    elif self._streamtype == ManifestParser.ST_HSSLIVE:
       return None
 
-    raise Exception("Not implemented for %s streams." %   self.gettypestring())
+    raise Exception("Not implemented for %s streams." % self.getstreamtypestring())
 
 
   # returns the timescale in local unit
   def gettimescale(self):
-    if self._type == ManifestParser.T_HSS or self._type == ManifestParser.T_HSSLIVE:
+    if self._streamtype == ManifestParser.ST_HSS or self._streamtype == ManifestParser.ST_HSSLIVE:
       return int(self._manifest.get('TimeScale',10000000))    #HSS default value
 
-    raise Exception("Not implemented for %s streams." % self.gettypestring())
+    raise Exception("Not implemented for %s streams." % self.getstreamtypestring())
 
+  def gettypes(self):
+    if self._streamtype == ManifestParser.ST_HSS or self._streamtype == ManifestParser.ST_HSSLIVE:
+      types = []
+
+      for qlev in self._manifest.findall("./StreamIndex"):
+        if str(qlev.attrib['Type']) not in types:
+          types.append(str(qlev.attrib['Type']))
+
+      for type in types:
+        yield type
+
+    else:
+      raise Exception("Not implemented for %s streams." % self.getstreamtypestring())
 
   def getbitratesfor(self, type="video"):
-    if self._type == ManifestParser.T_HSS or self._type == ManifestParser.T_HSSLIVE:
+    if self._streamtype == ManifestParser.ST_HSS or self._streamtype == ManifestParser.ST_HSSLIVE:
       for qlev in self._manifest.findall("./StreamIndex[@Type='" + type + "']/QualityLevel"):
         yield int(qlev.attrib['Bitrate'])
 
-    elif self._type == ManifestParser.T_DASH:
+    elif self._streamtype == ManifestParser.ST_DASH:
       ns = {'ns': 'urn:mpeg:DASH:schema:MPD:2011'}
       # for actor in self._root.findall(".//ns:ContentComponent[@contentType='"+contentType+"']../ns:Representation", ns):
       aset = self._manifest.find(".//ns:ContentComponent[@contentType='" + type + "']..", ns)
@@ -146,7 +158,7 @@ class ManifestParser:
 
   # returns a tuple of {url, byterange, fragmentlength} for all fragments
   def getfragmenturlsfor(self, bitrate, type="video"):
-    if self._type == ManifestParser.T_HSS:
+    if self._streamtype == ManifestParser.ST_HSS:
       timescale = self.gettimescale()
       baseurl = self._url.replace('/Manifest','') + '/' + self._manifest.find("./StreamIndex[@Type='" + type + "']").attrib['Url'].replace('{bitrate}',str(bitrate))
 
@@ -156,7 +168,7 @@ class ManifestParser:
         yield {'url': baseurl.replace('{start time}',str(t)), 'byterange': None, 'time': t/timescale, 'duration': d / timescale}
         t += d
 
-    elif self._type == ManifestParser.T_HSSLIVE:
+    elif self._streamtype == ManifestParser.ST_HSSLIVE:
       timescale = self.gettimescale()
       baseurl = self._url.replace('/Manifest', '') + '/' + self._manifest.find("./StreamIndex[@Type='" + type + "']").attrib['Url'].replace('{bitrate}', str(bitrate))
 
@@ -176,7 +188,7 @@ class ManifestParser:
             t += d
 
 
-    elif self._type == ManifestParser.T_DASH:     #TODO: check and rewrite
+    elif self._streamtype == ManifestParser.ST_DASH:     #TODO: check and rewrite
       mp4 = MP4Parser()
       repsegurl = mp.getrepsegurl(bitrate, type)
       repseg = mp.fetchdata(repsegurl)
@@ -195,14 +207,14 @@ class ManifestParser:
 
   def _getrepurl(self, bitrate, type="video"):  # TODO: type check not present
     url = ""
-    if self._type == ManifestParser.T_DASH:
+    if self._streamtype == ManifestParser.ST_DASH:
       ns = {'ns': 'urn:mpeg:DASH:schema:MPD:2011'}
       url = self._baseurl + self._manifest.find(".//ns:Representation[@bandwidth='" + str(bitrate) + "']/ns:BaseURL",ns).text
     return url
 
   def getrepsegurl(self, bitrate, type="video"):  # TODO: type check not present
     url = {'url': "", 'byterange': None}
-    if self._type == ManifestParser.T_DASH:
+    if self._streamtype == ManifestParser.ST_DASH:
       ns = {'ns': 'urn:mpeg:DASH:schema:MPD:2011'}
       url['byterange'] = \
       self._manifest.find(".//ns:Representation[@bandwidth='" + str(bitrate) + "']/ns:SegmentBase", ns).attrib[
@@ -212,7 +224,7 @@ class ManifestParser:
 
   def getrepiniturl(self, bitrate):
     url = {'url': "", 'byterange': None}
-    if self._type == ManifestParser.T_DASH:
+    if self._streamtype == ManifestParser.ST_DASH:
       ns = {'ns': 'urn:mpeg:DASH:schema:MPD:2011'}
       url['byterange'] = \
       self._manifest.find(".//ns:Representation[@bandwidth='" + str(bitrate) + "']/ns:SegmentBase/ns:Initialization",
@@ -254,9 +266,9 @@ class ManifestParser:
 
   def geturlsfor(self, type="video"):
     bw = []
-    if self._type == ManifestParser.T_HSS:
+    if self._streamtype == ManifestParser.ST_HSS:
       pass
-    elif self._type == ManifestParser.T_DASH:
+    elif self._streamtype == ManifestParser.ST_DASH:
       ns = {'ns': 'urn:mpeg:DASH:schema:MPD:2011'}
       # for actor in self._root.findall(".//ns:ContentComponent[@contentType='"+contentType+"']../ns:Representation", ns):
       aset = self._manifest.find(".//ns:ContentComponent[@contentType='" + type + "']..", ns)
