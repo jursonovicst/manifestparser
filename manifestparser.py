@@ -36,7 +36,7 @@ class SmoothStreamingMedia: #SmoothStreamingMedia
         if xml.tag != "SmoothStreamingMedia":
             raise NotImplementedError("Smooth streaming tag %s has not been implemented" % xml.tag)
 
-        smoothstreamingmedia = SmoothStreamingMedia(int(xml.attrib['MajorVersion']), int(xml.attrib['MinorVersion']), int(xml.get('TimeScale',10000000)), int(xml.get('Duration',0)), bool(xml.get('IsLive',"false")), url.replace("/Manifest",""))
+        smoothstreamingmedia = SmoothStreamingMedia(xml.get('MajorVersion',None), xml.get('MinorVersion',None), xml.get('TimeScale',10000000), xml.get('Duration',0), xml.get('IsLive',"false"), url.replace("/Manifest",""))
 
         for element in xml.iter("StreamIndex"):
             smoothstreamingmedia.addstreamelement(StreamElement.parsexml(element))
@@ -44,20 +44,17 @@ class SmoothStreamingMedia: #SmoothStreamingMedia
         return smoothstreamingmedia
 
     def __init__(self, majorversion, minorversion, timescale, duration, islive, baseurl):
-        if majorversion != 2:
-            raise NotImplementedError("Smooth streaming protocol version: %d.x is not implemented." % majorversion)
-        self.majorversion = majorversion
+        if majorversion is None or int(majorversion) != 2:
+            raise Exception("Violation of 2.2.2.1: The major version of the Manifest Response message. MUST be set to 2. '%s' received" % majorversion)
+        self.majorversion = int(majorversion)
 
-        if minorversion == 1:
-            print("minor=1!!!")
-        elif minorversion != 0 and minorversion != 2:
-            raise NotImplementedError("Smooth streaming protocol version: %d.%d is not implemented." % (majorversion, minorversion))
+        if minorversion is None or int(minorversion) not in [0,2]:
+            raise Exception("Violation of 2.2.2.1: The minor version of the Manifest Response message. MUST be set to 0 or 2. '%s.%s' received" % (majorversion, minorversion))
+        self.minorversion = int(minorversion)
 
-        self.minorversion = minorversion
-
-        self.timescale = timescale
-        self.duration = duration
-        self.islive = islive
+        self.timescale = int(timescale)
+        self.duration = int(duration)
+        self.islive = True if str(islive).lower() in ['true'] else False
 
         self._streamelements = []
         self._baseurl = baseurl
@@ -75,8 +72,13 @@ class SmoothStreamingMedia: #SmoothStreamingMedia
         print(self.__class__.__name__)
         print("majorv:\t%d" % self.majorversion)
         print("minorv:\t%d" % self.minorversion)
+        print("timesc:\t%s" % str(self.timescale) if self.timescale is not None else "None")
+        print("durati:\t%s" % str(self.duration) if self.duration is not None else "None")
+        print("live stream" if self.islive else "on-demand stream")
         for streamelement in self._streamelements:
             streamelement.printtree()
+
+
 
 class StreamElement:    #StreamIndex
 
@@ -85,7 +87,7 @@ class StreamElement:    #StreamIndex
         if xml.tag != "StreamIndex":
             raise NotImplementedError("Invalid StreamIndex element: '%s'" % xml.tag)
 
-        streamelement = StreamElement(str(xml.attrib['Type']), xml.get('TimeScale',None), str(xml.get('Name',xml.attrib['Type'])), str(xml.attrib['Url']))
+        streamelement = StreamElement(xml.get('Type',None), xml.get('TimeScale',None), xml.get('Name',xml.attrib['Type']), xml.attrib['Url'])
 
         for element in xml.iter("QualityLevel"):
             streamelement.addtrackelement(TrackElement.parsexml(element))
@@ -96,13 +98,13 @@ class StreamElement:    #StreamIndex
         return streamelement
 
     def __init__(self, type, streamtimescale, name, url):
-        if( type not in ["video", "audio", "text"]):
-            raise NotImplementedError("Invalid Type attribute: '%s'" % type)
-        self.type = type        #must have
+        if( type is None or type not in ["video", "audio", "text"]):
+            raise Exception("Violation of 2.2.2.3: The type of the stream: video, audio, or text. '%s' received" % type)
+        self.type = str(type)
 
-        self.streamtimescale = streamtimescale
-        self.name = name
-        self.url = url
+        self.streamtimescale = int(streamtimescale) if streamtimescale is not None else None
+        self.name = str(name) if name is not None else None
+        self.url = str(url)
 
         self._trackelements = []
         self._streamfragments = []
@@ -134,8 +136,10 @@ class StreamElement:    #StreamIndex
         print("==========")
         print(self.__class__.__name__)
         print("type:\t%s" % self.type)
-        print("name:\t%s" % self.name)
-        print("url:\t%s" % self.url)
+        if (self.name is not None):
+            print("name:\t%s" % self.name)
+        if(self.url is not None):
+            print("url:\t%s" % self.url)
         for trackelement in self._trackelements:
             trackelement.printtree()
         for streamfragment in self._streamfragments:
@@ -150,10 +154,13 @@ class TrackElement: #QualityLevel
         if xml.tag != "QualityLevel":
             raise NotImplementedError("Invalid TrackElement element: '%s'" % xml.tag)
 
-        return TrackElement(int(xml.attrib['Bitrate']))
+        return TrackElement(xml.get('Bitrate',None))
 
     def __init__(self, bitrate):
-        self.bitrate = bitrate
+        if (bitrate is None):
+            raise Exception("Violation of 2.2.2.5: The following fields are required and MUST be present in TrackAttributes: IndexAttribute and BitrateAttribute.")
+
+        self.bitrate = int(bitrate)
 
     def printtree(self):
         print("--" + self.__class__.__name__ + "--")
