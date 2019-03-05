@@ -1,14 +1,13 @@
 from io import BytesIO
 import pycurl
-# from lxml import etree
 import numpy as np
 import os
 from typing import Callable
 import chardet
-# import random
 import xml.etree.ElementTree as ET
 import re
 from urllib.parse import urlparse
+import random
 
 
 class MParser:
@@ -20,8 +19,7 @@ class MParser:
 
         self._url = url
 
-        response = None
-
+        # download manifest
         curl = pycurl.Curl()
         curl.setopt(pycurl.URL, self._url)
         response = BytesIO()
@@ -47,24 +45,28 @@ class MParser:
     def hss(self):
         if self._manifest.tag == 'SmoothStreamingMedia':
             return True
+        return False
 
     @property
     def dash(self):
         if self._manifest.tag == "MPD":
             return True
+        return False
 
     @property
     def live(self):
         if self.hss:
             return self._manifest.get('IsLive', default="false") == "true"
+        elif self.dash:
+            raise NotImplementedError("DASH parsing not yet fully supported.")
 
     @property
     def vod(self):
-        if self.hss:
-            return not self.live
+        return not self.live
 
     def bitrates(self, stream):
         bitrates = None
+
         if self.hss:
             streamindex = self._manifest.find("StreamIndex[@Type='%s']" % stream)
             if streamindex is None:
@@ -124,10 +126,13 @@ class MParser:
                            )
 
         elif self.dash:
+
+            raise NotImplementedError("DASH parsing not yet fully supported.")
             # get the AdaptationSet
 
             bitrates = self.bitrates(stream)
-            baseurls = {int(representation.get('bandwidth')): representation.find('BaseURL').text for representation in self._manifest.findall("Period/AdaptationSet[@contentType='%s']/Representation" % stream)}
+            baseurls = {int(representation.get('bandwidth')): representation.find('BaseURL').text for representation in
+                        self._manifest.findall("Period/AdaptationSet[@contentType='%s']/Representation" % stream)}
 
             for at in range(100):
 
@@ -139,5 +144,3 @@ class MParser:
                        baseurls[strategy(bitrates)],
                        (None, None)
                        )
-
-
