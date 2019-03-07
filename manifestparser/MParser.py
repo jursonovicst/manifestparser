@@ -84,7 +84,7 @@ class MParser:
 
         return bitrates
 
-    def fragments(self, stream, strategy, lenght=0):
+    def fragments(self, stream, strategy, duration=0):
         assert isinstance(strategy, Callable), "Strategy must be callable: '%s'" % strategy
 
         if self.hss:
@@ -116,7 +116,7 @@ class MParser:
                 for cd in np.cumsum(ds):
 
                     # limit stream length
-                    if lenght != 0 and float(cd) / timescale > lenght:
+                    if duration != 0 and float(cd) / timescale > duration:
                         break
 
                     yield (float(cd) / timescale,
@@ -137,7 +137,7 @@ class MParser:
             for at in range(100):
 
                 # limit stream length
-                if lenght != 0 and at > lenght:
+                if duration != 0 and at > duration:
                     break
 
                 yield (at,
