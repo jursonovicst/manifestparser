@@ -12,9 +12,9 @@ class TestMParser(TestCase):
 
     @classmethod
     def setUpClass(cls):
-        Handler = http.server.SimpleHTTPRequestHandler
+        handler = http.server.SimpleHTTPRequestHandler
 
-        cls._httpd = socketserver.TCPServer(("127.0.0.1", cls._port), Handler)
+        cls._httpd = socketserver.TCPServer(("127.0.0.1", cls._port), handler)
         cls._httpdthread = Thread(target=cls._httpd.serve_forever)
         cls._httpdthread.start()
 
