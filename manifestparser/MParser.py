@@ -26,11 +26,12 @@ class MParser:
         curl.setopt(pycurl.WRITEDATA, response)
         curl.perform()
 
-        if int(curl.getinfo(pycurl.HTTP_CODE)) != 200:
+        statuscode = int(curl.getinfo(pycurl.HTTP_CODE))
+        if statuscode != 200:
             curl.close()
             raise Exception(
                 "Cannot load '%s', HTTP status code: %d" % (
-                    curl.geturl(), curl.getinfo(pycurl.HTTP_CODE)))
+                    url, statuscode))
 
         curl.close()
 
