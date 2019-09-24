@@ -23,7 +23,10 @@ class MParser:
         curl = pycurl.Curl()
         curl.setopt(pycurl.URL, self._url)
         response = BytesIO()
+        headers = BytesIO()
         curl.setopt(pycurl.WRITEDATA, response)
+        curl.setopt(pycurl.WRITEHEADER, headers)
+        curl.setopt(pycurl.FOLLOWLOCATION, True)
         curl.perform()
 
         statuscode = int(curl.getinfo(pycurl.HTTP_CODE))
@@ -35,12 +38,21 @@ class MParser:
 
         curl.close()
 
+        # parse redirect
+        m = re.search(r'Location: (.*)', headers.getvalue().decode())
+        if m is not None:
+            self._url = m.group(1)
+
         # detect XML encoding and fuck Microsoft!
         charset = chardet.detect(response.getvalue())['encoding']
 
         # etree does not support default namespace, so remove default namespaces!
         manifest = re.sub(r'\sxmlns="[^"]+"', '', response.getvalue().decode(charset), count=1).encode(charset)
         self._manifest = ET.fromstring(manifest)
+
+    @property
+    def urlp(self):
+        return urlparse(self._url)
 
     @property
     def hss(self):
